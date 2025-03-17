@@ -6,7 +6,8 @@
 #include <bitset>
 #include <locale>
 #include <codecvt>
-
+#include <stdexcept> 
+#include <iomanip>
 using namespace std;
 
 
@@ -24,41 +25,87 @@ union EncodedChar
     uint16_t value;                   
 };
 
-float Multiply(int a, int b) {
-    float result = 0.0f;
-    float floatA = static_cast<float>(a); 
-    while (b > 0) {
-        if (b & 1) {
-            result += floatA;
-        }
-        floatA *= 2.0f; 
-        b /= 2;         
+int Multiply(int a, int b) {
+    int result = 0;
+    bool negative = false;
+
+   
+    if ((a < 0 && b > 0) || (a > 0 && b < 0)) {
+        negative = true;
     }
-    return result;
+
+  
+    a = abs(a);
+    b = abs(b);
+
+   
+    while (b > 0) {
+        if (b & 1) { 
+            result += a;
+        }
+        a <<= 1;
+        b >>= 1;
+    }
+
+    return negative ? -result : result;
 }
 
-float Divide(int a, int b) {
-    if (b == 0) {
-        wcerr << L"Помилка: ділення на нуль!" << endl;
-        return 0.0f;
+float Divide(int dividend, int divisor) {
+    if (divisor == 0) {
+        throw runtime_error("Division by zero is not allowed.");
     }
 
-    float result = 0.0f;
-    float floatA = static_cast<float>(a); 
-    float floatB = static_cast<float>(b); 
+    bool negative = false;
 
-    while (floatA >= floatB) {
-        float tempB = floatB, multiple = 1.0f;
 
-        while (floatA >= (tempB * 2.0f)) { 
-            tempB *= 2.0f;
-            multiple *= 2.0f;
+    if ((dividend < 0 && divisor > 0) || (dividend > 0 && divisor < 0)) {
+        negative = true;
+    }
+
+
+    int absDividend = abs(dividend);
+    int absDivisor = abs(divisor);
+
+    float quotient = 0.0f;
+
+    // Ціла частина ділення
+    while (absDividend >= absDivisor) {
+        int power = 0;
+        int temp = absDivisor;
+
+
+        while (temp <= absDividend && temp > 0) {
+            temp <<= 1;
+            power++;
         }
 
-        floatA -= tempB;
-        result += multiple;
+
+        temp >>= 1;
+        power--;
+
+        absDividend -= temp;
+
+      
+        quotient += (1 << power);
     }
-    return result;
+
+    // Дробова частина ділення
+    const int precision = 6; 
+    float fraction = 0.0f;
+    float factor = 0.5f; 
+
+    for (int i = 0; i < precision; ++i) {
+        absDividend <<= 1; 
+        if (absDividend >= absDivisor) {
+            fraction += factor;
+            absDividend -= absDivisor;
+        }
+        factor /= 2.0f; 
+    }
+
+    quotient += fraction;
+
+    return negative ? -quotient : quotient;
 }
 
 int parityBit(int value, int bits = 8)
@@ -109,7 +156,6 @@ wstring readFromFile(const string& filename)
 }
 
 
-#include <fstream>
 
 void encryptAndSave(const wstring& inputFile, const wstring& binaryFile) 
 {
@@ -258,13 +304,24 @@ void decryptAndShow(const wstring& binaryFile, const wstring& outputFile) {
 
 
 void Task1() {
-    int a, b, c, d; 
+    int a, b, c, d;
     float res;
 
     wcout << L"Введіть значення a, b, c, d: ";
     wcin >> a >> b >> c >> d;
-    res = Divide((Multiply(a, 18) + Multiply(312, d)), 512) - Multiply(122, b) + Multiply(c, 123);
-    wcout << L"Результат: " << res << endl;
+
+    try {
+        // Обчислюємо результат за заданою формулою
+        res = Divide((Multiply(a, 18) + Multiply(312, d)), 512)
+            - Multiply(122, b)
+            + Multiply(c, 123);
+
+        // Виводимо результат з точністю до 6 знаків після коми
+        wcout << L"Результат: " << fixed << setprecision(6) << res << endl;
+    }
+    catch (const exception& e) {
+        wcerr << L"Помилка: " << e.what() << endl;
+    }
 }
 
 void Task2()
