@@ -271,13 +271,126 @@ void saveToFile(const string& filename, const vector<uint8_t>& data) {
 
 
 
+void encryptAndSave2(const wstring& binaryFile) {
+    vector<wstring> inputLines(16, wstring(16, L' ')); 
+
+    wcout << L"Введіть текст (16 рядків, кожен до 16 символів):" << endl;
+    for (int i = 0; i < 16; i++) {
+        wcout << L"Рядок " << i + 1 << L": ";
+        wcin >> inputLines[i];
+        if (inputLines[i].size() < 16) {
+            inputLines[i].resize(16, L' '); 
+        }
+        else {
+            inputLines[i] = inputLines[i].substr(0, 16); 
+        }
+    }
+
+    ofstream outFile(binaryFile, ios::binary);
+    if (!outFile) {
+        wcerr << L"Помилка: Не вдалося відкрити бінарний файл для запису!" << endl;
+        return;
+    }
+
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            wchar_t ch = inputLines[i][j];
+
+            if (ch == L' ') continue;
+
+            int asciiCode = static_cast<int>(ch);
+
+            uint16_t encryptedValue = 0;
+            encryptedValue |= (i & 0b1111) << 12;
+            encryptedValue |= (asciiCode & 0b1111) << 8;
+            encryptedValue |= parityBit((i & 0b1111) | ((asciiCode & 0b1111) << 4)) << 7;
+            encryptedValue |= ((asciiCode >> 4) & 0b1111) << 3;
+            encryptedValue |= (j & 0b11) << 1;
+            encryptedValue |= parityBit(((asciiCode >> 4) & 0b1111) | ((j & 0b11) << 4));
+
+            outFile.write(reinterpret_cast<char*>(&encryptedValue), sizeof(uint16_t));
+        }
+    }
+
+    outFile.close();
+    wcout << L"Шифрування завершено! Дані збережено у " << binaryFile << endl;
+}
+
+void decryptAndShow2(const wstring& binaryFile) {
+    ifstream inFile(binaryFile, ios::binary);
+    if (!inFile) {
+        wcerr << L"Помилка: Не вдалося відкрити бінарний файл для читання!" << endl;
+        return;
+    }
+
+    vector<wstring> lines(16, wstring(16, L' ')); 
+
+    while (true) {
+        uint16_t encryptedValue;
+        inFile.read(reinterpret_cast<char*>(&encryptedValue), sizeof(uint16_t));
+        if (!inFile) break; 
+
+
+        int rowBits = (encryptedValue >> 12) & 0b1111; 
+        int lowAsciiBits = (encryptedValue >> 8) & 0b1111; 
+        int parity1 = (encryptedValue >> 7) & 0b1; 
+        int highAsciiBits = (encryptedValue >> 3) & 0b1111; 
+        int positionBits = (encryptedValue >> 1) & 0b11; 
+        int parity2 = encryptedValue & 0b1; 
+
+   
+        bool isValidParity1 = (parity1 == parityBit((rowBits & 0b1111) | (lowAsciiBits << 4)));
+        bool isValidParity2 = (parity2 == parityBit((highAsciiBits & 0b1111) | (positionBits << 4)));
+
+        if (!isValidParity1 || !isValidParity2) {
+            wcerr << L"Помилка: Неправильна парність у зашифрованих даних!" << endl;
+            continue; 
+        }
+
+    
+        int asciiCode = (highAsciiBits << 4) | lowAsciiBits;
+        wchar_t ch = static_cast<wchar_t>(asciiCode);
+
+
+  
+        if (rowBits >= 0 && rowBits < 16 && positionBits >= 0 && positionBits < 16) {
+            lines[rowBits][positionBits] = ch;
+        }
+    }
+
+    inFile.close();
+
+
+    for (int i = 0; i < 16; i++) {
+        for (int j = 0; j < 16; j++) {
+            if (lines[i][j] == L'\0') { 
+                lines[i][j] = L' ';    
+            }
+        }
+    }
+
+    wcout << L"Розшифрований текст:\n";
+    for (const auto& line : lines) {
+        wcout << line << endl;
+    }
+
+    wcout << L"Розшифрування завершено!" << endl;
+}
+
 void Task2() {
+    wstring encryptedFile = L"encrypted.bin";
+    encryptAndSave2(encryptedFile);
+    decryptAndShow2(encryptedFile);
+}
+
+
+void Task3() {
     wstring encryptedFile = L"encrypted.bin";
     encryptAndSave(encryptedFile);
     decryptAndShow(encryptedFile);
 }
 
-void Task3() {
+void Task4() {
     wstring input;
     wcout << L"Введіть текст (натисніть '#' і Enter, щоб завершити): ";
 
@@ -343,6 +456,7 @@ int main()
         case 1: Task1(); break;
         case 2: Task2(); break;
         case 3: Task3(); break;
+        case 4: Task4(); break;
         case 0: break;
         default: wcout << L"Невірний вибір!" << endl;
         }
